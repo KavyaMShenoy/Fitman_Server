@@ -24,17 +24,6 @@ const UserSchema = new mongoose.Schema(
       minlength: 6
     },
 
-    confirmPassword: {
-      type: String,
-      required: true,
-      validate: {
-        validator: function (value) {
-          return value === this.password;
-        },
-        message: "Passwords do not match."
-      }
-    },
-
     role: {
       type: String,
       enum: ["admin", "user"],
@@ -49,8 +38,8 @@ const UserSchema = new mongoose.Schema(
       }
     },
 
-    age: { type: Number, min: 18, max: 120 },
-    gender: { type: String, enum: ["male", "female", "other"] },
+    age: { type: Number, min: 18, max: 120 , required: true},
+    gender: { type: String, enum: ["male", "female", "other"],required: true },
 
     weight: { type: Number, required: true, min: 30, max: 500 },  // kg
     height: { type: Number, required: true, min: 50, max: 250 },  // cm
@@ -65,13 +54,13 @@ const UserSchema = new mongoose.Schema(
     dailyWaterGoal: { type: Number, default: 8, required: true }, // glasses
     phone: { type: String , unique: true, sparse: true, required: true},
     address: {
-      street: String,
-      city: String,
-      state: String,
-      pincode: String,
-      country: String
+      street: {type: String, required: true},
+      city: {type: String, required: true},
+      state: {type: String, required: true},
+      pincode: {type: String, required: true},
+      country: {type: String, required: true}
     },
-    profilePic: { type: String },
+    profilePic: { type: String }
   },
   {
     timestamps: true,
@@ -92,13 +81,6 @@ UserSchema.virtual("BMI").get(function () {
   return null;
 });
 
-UserSchema.pre("validate", function (next) {
-  if (this.password !== this.confirmPassword) {
-    return next(new Error("Passwords do not match."));
-  }
-  next();
-});
-
 UserSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
 
@@ -106,7 +88,6 @@ UserSchema.pre("save", async function (next) {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
 
-    this.confirmPassword = undefined;
     next();
   } catch (error) {
     next(error);

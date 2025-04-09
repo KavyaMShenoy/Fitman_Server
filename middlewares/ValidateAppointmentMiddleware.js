@@ -1,42 +1,48 @@
 const Joi = require("joi");
 const User = require("../models/UserModel");
 const Trainer = require("../models/TrainerModel");
+const mongoose = require("mongoose");
+
+const objectIdValidator = Joi.extend((joi) => ({
+    type: "objectId",
+    base: joi.string(),
+    messages: {
+        "objectId.base": "Invalid ID format."
+    },
+    validate(value, helpers) {
+        if (!mongoose.Types.ObjectId.isValid(value)) {
+            return { value, errors: helpers.error("objectId.base") };
+        }
+        return { value };
+    }
+}));
 
 const ValidateAppointmentMiddleware = async (req, res, next) => {
     const schema = Joi.object({
-        userId: Joi.string()
-            .regex(/^[0-9a-fA-F]{24}$/)
-            .required()
-            .messages({
-                "string.pattern.base": "Invalid userId format.",
-                "any.required": "User ID is required."
-            }),
-        trainerId: Joi.string()
-            .regex(/^[0-9a-fA-F]{24}$/)
-            .required()
-            .messages({
-                "string.pattern.base": "Invalid trainerId format.",
-                "any.required": "Trainer ID is required."
-            }),
-        date: Joi.date()
-            .iso()
-            .greater("now")
-            .required()
-            .messages({
-                "date.greater": "Appointment date must be in the future.",
-                "any.required": "Appointment date is required.",
-                "date.format": "Invalid date format. Use ISO date format."
-            }),
-        status: Joi.string()
-            .valid("pending", "confirmed", "completed", "cancelled")
-            .default("pending")
-            .messages({
-                "any.only": "Invalid status value."
-            }),
-        notes: Joi.string().trim().max(500).optional()
-            .messages({
-                "string.max": "Notes cannot exceed 500 characters."
-            })
+        userId: objectIdValidator.objectId().required().messages({
+            "objectId.base": "Invalid user ID format.",
+            "any.required": "User ID is required."
+        }),
+
+        trainerId: objectIdValidator.objectId().required().messages({
+            "objectId.base": "Invalid trainer ID format.",
+            "any.required": "Trainer ID is required."
+        }),
+
+        appointmentDate: Joi.date().greater("now").required().messages({
+            "date.greater": "Appointment date must be in the future.",
+            "any.required": "Appointment date is required.",
+            "date.format": "Invalid date format. Use ISO date format."
+        }),
+
+        status: Joi.string().valid("pending", "confirmed", "completed", "cancelled").default("pending").messages({
+            "any.only": "Invalid status value."
+        }),
+
+        serviceType: Joi.string().valid("personal_training", "nutrition_plan", "rehabilitation").required().messages({
+            "any.required": "Service type is required.",
+            "any.only": "Invalid service type."
+        })
     });
 
     const { error } = schema.validate(req.body);
@@ -70,7 +76,7 @@ const ValidateAppointmentMiddleware = async (req, res, next) => {
 
         next();
 
-    } catch (error) {
+    } catch (err) {
         return res.status(500).json({
             message: "Server error while validating appointment.",
             success: false

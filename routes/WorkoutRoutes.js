@@ -1,23 +1,28 @@
 const express = require("express");
 const Auth = require("../middlewares/Auth");
-const ValidateWorkoutMiddleware = require("../middlewares/ValidateWorkoutMiddleware");
 const WorkoutController = require("../controllers/WorkoutController");
-
+const ValidateSingleWorkoutEntry = require("../middlewares/ValidateSingleWorkoutEntry");
 const router = express.Router();
 
-// Fetch Workouts for a Specific User
-router.get("/", Auth, WorkoutController.getUserWorkoutsByUserId);
+// Fetch all workouts for a user
+router.get("/all", Auth, WorkoutController.getAllWorkoutEntriesByUserId);
 
-// Create Workout Entry/Entries for user
-router.post("/create", Auth, ValidateWorkoutMiddleware, WorkoutController.createWorkoutEntries);
+// Fetch today's workout
+router.get("/today", Auth, WorkoutController.getTodaysWorkoutEntry);
 
-// Update a Workout Entry
-router.put("/update/:id", Auth, ValidateWorkoutMiddleware, WorkoutController.updateWorkoutEntry);
+// Add or update workout for a specific date
+router.post("/addWorkout", Auth, ValidateSingleWorkoutEntry, WorkoutController.addOrUpdateWorkoutByDate);
 
-// Mark a Workout Entry as Complete
-router.patch("/complete/:id", Auth, WorkoutController.markWorkoutComplete);
+// Update specific workout entry by Id
+router.patch("/:workoutEntryId", Auth, WorkoutController.updateWorkoutEntryById);
 
-// Delete a Workout Entry
-router.delete("/delete/:id", Auth, WorkoutController.deleteWorkoutEntry);
+// Mark a workout complete
+router.patch("/complete/:date/:workoutType", Auth, WorkoutController.markWorkoutComplete);
+
+// Delete a workout entry by Id
+router.delete("/:workoutEntryId", Auth, WorkoutController.deleteWorkoutEntryById);
+
+// Delete all workouts for a given date
+router.delete("/date/:date", Auth, WorkoutController.deleteWorkoutDay);
 
 module.exports = router;

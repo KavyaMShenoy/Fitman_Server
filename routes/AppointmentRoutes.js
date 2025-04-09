@@ -5,16 +5,13 @@ const AppointmentController = require("../controllers/AppointmentController");
 
 const router = express.Router();
 
-// Fetch all the Appointments of the user
-router.get("/:id", AppointmentController.getAppointmentsOfUser);
+// Fetch all appointments for a user
+router.get("/", Auth, AppointmentController.getAppointmentsOfUser);
 
-// Create Appointment
+// Book a new appointment
 router.post("/create", Auth, ValidateAppointmentMiddleware, AppointmentController.createAppointment);
 
-// To Reschedule an Appointment
-router.put("/reschedule/:id", Auth, AppointmentController.rescheduleAppointment);
-
-// To cancel an Appointment
+// Cancel an appointment
 router.put("/cancel/:id", Auth, AppointmentController.cancelAppointment);
 
 module.exports = router;

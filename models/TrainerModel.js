@@ -2,13 +2,59 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const validator = require("validator");
 
+const feedbackSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true
+  },
+  feedback: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 500
+  },
+  rating: {
+    type: Number,
+    min: 1,
+    max: 5,
+    required: true
+  },
+  date: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+const bookingSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true
+  },
+  appointmentDate: {
+    type: Date,
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ["confirmed", "pending", "completed", "cancelled"],
+    default: "pending"
+  },
+  serviceType: {
+    type: String,
+    required: true,
+    enum: ["personal_training", "nutrition_plan", "rehabilitation"],
+  }
+})
+
 const TrainerSchema = new mongoose.Schema(
   {
-    fullName: { 
-      type: String, 
-      required: true, 
-      trim: true, 
-      maxlength: 100 
+    fullName: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 100
     },
 
     email: {
@@ -27,17 +73,6 @@ const TrainerSchema = new mongoose.Schema(
       type: String,
       required: true,
       minlength: 6
-    },
-
-    confirmPassword: {
-      type: String,
-      required: true,
-      validate: {
-        validator: function (value) {
-          return value === this.password;
-        },
-        message: "Passwords do not match."
-      }
     },
 
     specialization: {
@@ -63,26 +98,22 @@ const TrainerSchema = new mongoose.Schema(
     bio: {
       type: String,
       trim: true,
-      maxlength: 500
-    },
-
-    availability: {
-      days: [
-        {
-          type: String,
-          enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        }
-      ],
-      timeSlots: [
-        {
-          start: { type: String, match: /^([01]\d|2[0-3]):([0-5]\d)$/, required: true },
-          end: { type: String, match: /^([01]\d|2[0-3]):([0-5]\d)$/, required: true }
-        }
-      ]
+      maxlength: 500,
+      required: true
     },
 
     profilePic: {
       type: String  // Cloudinary URL
+    },
+
+    feedbacks: {
+      type: [feedbackSchema],
+      default: []
+    },
+
+    bookings: {
+      type: [bookingSchema],
+      default: []
     }
   },
   { timestamps: true }
@@ -90,41 +121,34 @@ const TrainerSchema = new mongoose.Schema(
 
 TrainerSchema.index({ email: 1 });
 TrainerSchema.index({ specialization: 1 });
-
-TrainerSchema.pre("validate", function (next) {
-  if (this.password !== this.confirmPassword) {
-    return next(new Error("Passwords do not match."));
-  }
-  next();
-});
+TrainerSchema.set("toJSON", { virtuals: true });
+TrainerSchema.set("toObject", { virtuals: true });
+feedbackSchema.index({ user: 1 }, { unique: true, partialFilterExpression: { user: { $exists: true } } });
 
 TrainerSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
-
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
-
-    this.confirmPassword = undefined;
     next();
   } catch (error) {
     next(error);
   }
 });
 
-TrainerSchema.pre("save", function (next) {
-  if (this.availability && this.availability.timeSlots.length) {
-    for (const slot of this.availability.timeSlots) {
-      if (slot.start >= slot.end) {
-        return next(new Error("Start time must be earlier than end time."));
-      }
-    }
-  }
-  next();
-});
-
 TrainerSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
+
+TrainerSchema.virtual("feedbackCount").get(function () {
+  return Array.isArray(this.feedbacks) ? this.feedbacks.length : 0;
+});
+
+TrainerSchema.virtual('averageRating').get(function () {
+  if (!Array.isArray(this.feedbacks) || this.feedbacks.length === 0) return 0;
+  const total = this.feedbacks.reduce((acc, f) => acc + f.rating, 0);
+  return total / this.feedbacks.length;
+});
+
 
 module.exports = mongoose.model("Trainer", TrainerSchema);

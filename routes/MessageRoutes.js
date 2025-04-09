@@ -13,9 +13,6 @@ module.exports = (io) => {
     // Retrieve messages between user and trainer
     router.get('/:trainerId', Auth, controller.retrieveMessages);
 
-    // Mark messages as read
-    router.patch('/mark-read/:messageId', Auth, controller.markMessages);
-
     // Delete a message
     router.delete('/:messageId', Auth, controller.deleteMessage);
 

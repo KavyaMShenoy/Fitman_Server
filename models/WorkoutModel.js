@@ -1,9 +1,8 @@
 const mongoose = require("mongoose");
 
-const WorkoutSchema = new mongoose.Schema(
+
+const workoutEntrySchema = new mongoose.Schema(
     {
-        userId: { type: mongoose.Types.ObjectId, ref: "User", required: true },
-        trainerId: { type: mongoose.Types.ObjectId, ref: "Trainer" },
         workoutName: { type: String, required: true, trim: true, maxlength: 100 },
         workoutType: { type: String, enum: ["strength", "cardio", "flexibility", "HIIT"], required: true },
         duration: { type: Number, min: 1, max: 300, required: true },       // in minutes
@@ -11,68 +10,62 @@ const WorkoutSchema = new mongoose.Schema(
         sets: { type: Number, min: 1, max: 100, default: 1 },
         reps: { type: Number, min: 1, max: 100, default: 1 },
         weights: { type: Number, min: 0, max: 1000, default: 0 },
-        completed: { type: Boolean, default: false }
+        completed: { type: Boolean, default: false },
+        trainerComment: { type: String, maxlength: 300, trim: true }
+    }
+)
+
+const dailyWorkoutSchema = new mongoose.Schema({
+    date: {
+        type: Date,
+        required: true
+    },
+    workouts: [workoutEntrySchema]
+});
+
+const WorkoutSchema = new mongoose.Schema(
+    {
+        userId: { type: mongoose.Types.ObjectId, ref: "User", required: true },
+        trainerId: { type: mongoose.Types.ObjectId, ref: "Trainer", required: true },
+        workoutEntries: [dailyWorkoutSchema]
     },
     { timestamps: true }
 );
 
-const calculateCalories = (workoutType, duration) => {
-    const intensityFactor = {
-        strength: 8,        // 8 kcal/min
-        cardio: 10,         // 10 kcal/min
-        flexibility: 5,     // 5 kcal/min
-        HIIT: 12            // 12 kcal/min
-    };
-
-    const baseCalories = intensityFactor[workoutType] || 5;
-    return Math.min(duration * baseCalories, 5000);
-};
+workoutEntrySchema.pre("validate", function (next) {
+    if (!this.caloriesBurned && this.duration && this.workoutType) {
+        const intensityFactor = {
+            strength: 8,
+            cardio: 10,
+            flexibility: 5,
+            HIIT: 12
+        };
+        const baseCalories = intensityFactor[this.workoutType] || 5;
+        this.caloriesBurned = Math.min(this.duration * baseCalories, 5000);
+    }
+    next();
+});
 
 WorkoutSchema.pre("save", function (next) {
-    try {
-        if (typeof this.userId === "string" && mongoose.Types.ObjectId.isValid(this.userId)) {
-            this.userId = new mongoose.Types.ObjectId(this.userId);
-        }
-
-        if (this.trainerId && typeof this.trainerId === "string" && mongoose.Types.ObjectId.isValid(this.trainerId)) {
-            this.trainerId = new mongoose.Types.ObjectId(this.trainerId);
-        }
-
-        if (!this.caloriesBurned) {
-            this.caloriesBurned = calculateCalories(this.workoutType, this.duration);
-        }
-
-        next();
-    } catch (error) {
-        next(error);
+    if (typeof this.userId === "string" && mongoose.Types.ObjectId.isValid(this.userId)) {
+        this.userId = new mongoose.Types.ObjectId(this.userId);
     }
+    if (typeof this.trainerId === "string" && mongoose.Types.ObjectId.isValid(this.trainerId)) {
+        this.trainerId = new mongoose.Types.ObjectId(this.trainerId);
+    }
+
+    if (this.workoutEntries && this.workoutEntries.length) {
+        this.workoutEntries.forEach(entry => {
+            entry.date = new Date(new Date(entry.date).setHours(0, 0, 0, 0));
+
+        });
+    }
+    next();
 });
 
-WorkoutSchema.pre("findOneAndUpdate", function (next) {
-    try {
-        const update = this.getUpdate();
-
-        if (update.userId && typeof update.userId === "string" && mongoose.Types.ObjectId.isValid(update.userId)) {
-            update.userId = new mongoose.Types.ObjectId(update.userId);
-        }
-
-        if (update.trainerId && typeof update.trainerId === "string" && mongoose.Types.ObjectId.isValid(update.trainerId)) {
-            update.trainerId = new mongoose.Types.ObjectId(update.trainerId);
-        }
-
-        if (update.duration && !update.caloriesBurned) {
-            update.caloriesBurned = calculateCalories(update.workoutType, update.duration);
-        }
-
-        next();
-    } catch (error) {
-        next(error);
-    }
-});
-
-WorkoutSchema.index({ userId: 1, completed: 1, createdAt: -1 });
-WorkoutSchema.index({ trainerId: 1, completed: 1 });
-WorkoutSchema.index({ workoutType: 1, duration: 1 });
-WorkoutSchema.index({ workoutName: "text" });
+WorkoutSchema.index({ "workoutEntries.workoutEntries.workoutType": 1 });
+WorkoutSchema.index({ "workoutEntries.workoutEntries.duration": 1 });
+WorkoutSchema.index({ "workoutEntries.workoutEntries.workoutName": "text" });
+WorkoutSchema.index({ "workoutEntries.date": 1 });
 
 module.exports = mongoose.model("Workout", WorkoutSchema);

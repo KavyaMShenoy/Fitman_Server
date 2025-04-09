@@ -3,7 +3,7 @@ const router = express.Router();
 
 const UserController = require('../controllers/UserController');
 const ValidateUserMiddleware = require('../middlewares/ValidateUserMiddleware');
-const Auth = require("../middlewares/Auth");   // Authentication Middleware
+const Auth = require("../middlewares/Auth");
 
 // Register User
 router.post('/register', ValidateUserMiddleware, UserController.registerUser);

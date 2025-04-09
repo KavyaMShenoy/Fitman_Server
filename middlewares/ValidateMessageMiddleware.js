@@ -37,12 +37,6 @@ const messageSchema = Joi.object({
             "string.max": "Message cannot exceed 1000 characters."
         }),
 
-    isRead: Joi.boolean()
-        .optional()
-        .messages({
-            "boolean.base": "isRead must be a boolean value."
-        }),
-
     timestamp: Joi.date()
         .optional()
         .messages({
@@ -52,7 +46,11 @@ const messageSchema = Joi.object({
 
 const ValidateMessageMiddleware = (req, res, next) => {
     try {
-        const { error } = messageSchema.validate(req.body, { abortEarly: false });
+
+        const { error, value } = messageSchema.validate(req.body, {
+            abortEarly: false,
+            stripUnknown: true
+        });
 
         if (error) {
             return res.status(400).json({
@@ -62,6 +60,7 @@ const ValidateMessageMiddleware = (req, res, next) => {
             });
         }
 
+        req.body = value;
         next();
     } catch (err) {
         res.status(500).json({

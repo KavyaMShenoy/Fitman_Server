@@ -9,15 +9,24 @@ const router = express.Router();
 router.get("/", TrainerController.getAllTrainers);
 
 // Fetch Trainer Profile by id
-router.get("/:id", Auth, TrainerController.getTrainerById);
+router.get("/:trainerId", Auth, TrainerController.getTrainerById);
 
-// Create Trainer Profile (Only for Users with 'trainer' Role)
+// Create Trainer Profile
 router.post("/create", Auth, ValidateTrainerMiddleware, TrainerController.createTrainerProfile);
 
 // Update Trainer Profile (Only for the Trainer)
-router.put("/update", Auth, ValidateTrainerMiddleware, TrainerController.updateTrainerProfile);
+router.put("/update/:trainerId", Auth, ValidateTrainerMiddleware, TrainerController.updateTrainerProfile);
 
 // Delete Trainer Profile (Only for the Trainer)
-router.delete("/delete", Auth, TrainerController.deleteTrainer);
+router.delete("/delete/:trainerId", Auth, TrainerController.deleteTrainer);
+
+// Respond to appointments
+router.post("/respond-booking/:appointmentId", Auth, TrainerController.respondToAppointmentRequest);
+
+// Get feedback of a particular user for a specific trainer
+router.get('/feedbacks/:trainerId', Auth, TrainerController.getUserFeedbackForTrainer);
+
+// Post Feedback and Rating (create or update)
+router.put('/feedbacks/:trainerId', Auth, TrainerController.postFeedbacksRatings);
 
 module.exports = router;

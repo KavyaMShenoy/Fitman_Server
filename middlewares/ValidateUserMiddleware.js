@@ -40,14 +40,6 @@ const ValidateUserMiddleware = (req, res, next) => {
                 "string.pattern.base": "Password must contain at least one uppercase letter, one number, and one special character."
             }),
 
-        confirmPassword: Joi.string()
-            .required()
-            .valid(Joi.ref("password"))
-            .messages({
-                "string.empty": "Confirm password is required.",
-                "any.only": "Passwords do not match."
-            }),
-
         role: Joi.string().valid("admin", "user").required().messages({
             "any.only": "Role must be 'admin', or 'user'."
         }),
@@ -59,16 +51,18 @@ const ValidateUserMiddleware = (req, res, next) => {
                 otherwise: Joi.forbidden()
             })
             .messages({
-                "objectId.base": "Invalid user ID format.",
-                "any.required": "User ID is required."
+                "objectId.base": "Invalid trainer ID format.",
+                "any.required": "Trainer ID is required."
             }),
 
-        age: Joi.number().integer().min(18).max(120).optional().messages({
+        age: Joi.number().integer().min(18).max(120).required().messages({
+            "string.empty": "Age is required.",
             "number.min": "Age must be at least 18 years.",
             "number.max": "Age cannot exceed 120 years."
         }),
 
-        gender: Joi.string().valid("male", "female", "other").optional().messages({
+        gender: Joi.string().valid("male", "female", "other").required().messages({
+            "string.empty": "Gender is required.",
             "any.only": "Gender must be 'male', 'female', or 'other'."
         }),
 
@@ -87,16 +81,19 @@ const ValidateUserMiddleware = (req, res, next) => {
         fitnessGoal: Joi.string().valid("weight loss", "muscle gain", "endurance", "maintenance")
             .required()
             .messages({
+                "any.empty": "Fitness Goal is required.",
                 "any.only": "Fitness goal must be 'weight loss', 'muscle gain', 'endurance', or 'maintenance'."
             }),
 
         dailyCalorieGoal: Joi.number().integer().min(500).max(10000).required().messages({
+            "any.empty": "Daily Calorie Goal is required.",
             "number.base": "Daily calorie goal must be a number.",
             "number.min": "Daily calorie goal must be at least 500 kcal.",
             "number.max": "Daily calorie goal cannot exceed 10000 kcal."
         }),
 
         dailyWaterGoal: Joi.number().integer().min(1).max(20).required().messages({
+            "any.empty": "Daily Water Goal is required.",
             "number.base": "Daily water goal must be a number.",
             "number.min": "Daily water goal must be at least 1 glass.",
             "number.max": "Daily water goal cannot exceed 20 glasses."
@@ -105,29 +102,33 @@ const ValidateUserMiddleware = (req, res, next) => {
         phone: Joi.string()
             .required()
             .pattern(/^[0-9]{10}$/)
-            .optional()
             .messages({
                 "string.pattern.base": "Phone number must be a 10-digit number.",
                 "any.required": "Phone number is required for users."
             }),
 
         address: Joi.object({
-            street: Joi.string().trim().max(100).optional().messages({
+            street: Joi.string().trim().max(100).required().messages({
+                "string.empty": "Street details is required.",
                 "string.max": "Street cannot exceed 100 characters."
             }),
-            city: Joi.string().trim().max(50).optional().messages({
+            city: Joi.string().trim().max(50).required().messages({
+                "string.empty": "City is required.",
                 "string.max": "City cannot exceed 50 characters."
             }),
-            state: Joi.string().trim().max(50).optional().messages({
+            state: Joi.string().trim().max(50).required().messages({
+                "string.empty": "State is required.",
                 "string.max": "State cannot exceed 50 characters."
             }),
-            pincode: Joi.string().pattern(/^\d{6}$/).optional().messages({
+            pincode: Joi.string().pattern(/^\d{6}$/).required().messages({
+                "string.empty": "Pincode is required.",
                 "string.pattern.base": "Pincode code must be 6 digits."
             }),
-            country: Joi.string().trim().max(50).optional().messages({
+            country: Joi.string().trim().max(50).required().messages({
+                "string.empty": "Country is required.",
                 "string.max": "Country cannot exceed 50 characters."
             })
-        }).optional(),
+        }).required(),
 
         profilePic: Joi.string().uri().optional().messages({
             "string.uri": "Profile picture must be a valid URL."

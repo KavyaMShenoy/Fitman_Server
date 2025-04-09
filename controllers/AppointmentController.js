@@ -1,16 +1,33 @@
 const Appointment = require("../models/AppointmentModel");
+const Trainer = require("../models/TrainerModel");
+const { validateObjectId } = require("../helpers/idValidation");
 
-// Fetch all the Appointments of the user
+const normalizeDate = (date) => {
+    return new Date(date);
+};
+
+// Fetch all appointments for a user
 exports.getAppointmentsOfUser = async (req, res, next) => {
     try {
-        const appointments = await Appointment.find({ userId: req.params.id })
-            .populate("trainerId", "fullName specialization")
-            .sort({ date: 1 });
+        const userId = req.user.id;
 
-        if (appointments.length === 0) {
-            return res.status(404).json({
-                message: "No Appointments found.",
+        if (!validateObjectId(userId)) {
+            return res.status(400).json({
+                message: "Invalid user ID format.",
                 success: false
+            });
+        }
+
+        const appointments = await Appointment.find({ userId })
+            .populate("trainerId", "fullName specialization")
+            .sort({ appointmentDate: 1 })
+            .lean();
+
+        if (!appointments || appointments.length === 0) {
+            return res.status(200).json({
+                message: "No appointments found.",
+                appointments: [],
+                success: true
             });
         }
 
@@ -19,103 +36,111 @@ exports.getAppointmentsOfUser = async (req, res, next) => {
             success: true
         });
     } catch (error) {
-        next(error);
+        next(error)
     }
-}
+};
 
-// Create Appointment
+
+// Book a new appointment
 exports.createAppointment = async (req, res, next) => {
     try {
-        const appointment = new Appointment(req.body);
+        const userId = req.user.id;
+
+        if (!validateObjectId(userId)) {
+            return res.status(400).json({
+                message: "Invalid user ID format.",
+                success: false
+            });
+        }
+
+        const { trainerId, appointmentDate, status, serviceType } = req.body;
+        const normalizedDate = normalizeDate(appointmentDate);
+
+        // Check for existing appointment on the same date for the same trainer
+        const existingAppointment = await Appointment.findOne({
+            trainerId,
+            appointmentDate: { $eq: new Date(normalizedDate) },
+            status: { $in: ["pending", "confirmed"] }
+        });
+
+        if (existingAppointment) {
+            return res.status(400).json({
+                message: "Trainer is already booked on this date.",
+                success: false
+            });
+        }
+
+        // Save the new appointment
+        const appointment = new Appointment({
+            ...req.body,
+            userId,
+            appointmentDate: new Date(normalizedDate)
+        });
+
         await appointment.save();
+
+        await Trainer.findByIdAndUpdate(trainerId, {
+            $push: {
+                bookings: {
+                    userId,
+                    appointmentDate: normalizedDate,
+                    status: appointment.status,
+                    serviceType
+                }
+            }
+        });
+
         res.status(201).json({
             message: "Appointment booked successfully.",
             success: true,
             appointment
         });
-    } catch (error) {
-        next(error);
-    }
-}
-
-// To Reschedule an Appointment
-exports.rescheduleAppointment = async (req, res, next) => {
-    try {
-        const { date } = req.body;
-        const appointmentId = req.params.id;
-
-        if (!date || new Date(date) <= new Date()) {
-            return res.status(400).json({
-                message: "New appointment date must be in the future.",
-                success: false
-            });
-        }
-
-        const appointment = await Appointment.findById(appointmentId);
-        if (!appointment) {
-            return res.status(404).json({
-                message: "Appointment not found.",
-                success: false
-            });
-        }
-
-        if (["completed", "cancelled"].includes(appointment.status)) {
-            return res.status(400).json({
-                message: "Cannot reschedule a completed or cancelled appointment.",
-                success: false
-            });
-        }
-
-        const trainerBookingConflict = await Appointment.findOne({
-            trainerId: appointment.trainerId,
-            date: date,
-            status: { $nin: ["completed", "cancelled"] }
-        });
-
-        if (trainerBookingConflict) {
-            return res.status(400).json({
-                message: "Trainer is already booked at this time.",
-                success: false
-            });
-        }
-
-        appointment.date = date;
-        appointment.status = "pending";
-        await appointment.save();
-
-        res.status(200).json({
-            message: "Appointment rescheduled successfully.",
-            appointment,
-            success: true
-        });
 
     } catch (error) {
         next(error);
     }
-}
+};
 
-// To cancel an Appointment
+// Cancel an appointment
 exports.cancelAppointment = async (req, res, next) => {
     try {
         const appointmentId = req.params.id;
 
-        const updatedAppointment = await Appointment.findOneAndUpdate(
-            { _id: appointmentId, status: { $nin: ["completed", "cancelled"] } },
-            { $set: { status: "cancelled" } },
-            { new: true }
-        );
+        const appointment = await Appointment.findOne({
+            _id: appointmentId,
+            status: { $in: ["pending", "confirmed"] }
+        });
 
-        if (!updatedAppointment) {
+        if (!appointment) {
             return res.status(404).json({
-                message: "Appointment not found or cannot be cancelled.",
+                message: "Appointment not found or already cancelled/completed.",
                 success: false
             });
         }
 
+        appointment.status = "cancelled";
+        await appointment.save();
+
+        const normalizedDate = normalizeDate(appointment.appointmentDate);
+
+        // Update the corresponding booking's status in trainer's bookings array
+        await Trainer.updateOne(
+            {
+                _id: appointment.trainerId,
+                "bookings.userId": appointment.userId,
+                "bookings.appointmentDate": normalizedDate
+            },
+            {
+                $set: {
+                    "bookings.$.status": "cancelled"
+                }
+            }
+        );
+
         res.status(200).json({
-            message: "Appointment cancelled successfully.",
-            appointment: updatedAppointment,
-            success: true
+            message: "Appointment cancelled and trainer availability updated.",
+            success: true,
+            appointment
         });
 
     } catch (error) {

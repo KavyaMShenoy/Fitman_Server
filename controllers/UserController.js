@@ -1,17 +1,24 @@
 const User = require('../models/UserModel');
-const Trainer = require("../models/TrainerModel");
 const jwt = require('jsonwebtoken');
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const { validateObjectId } = require("../helpers/idValidation");
 
 // Register User
 exports.registerUser = async (req, res, next) => {
     try {
         const {
-            fullName, email, password, confirmPassword, role,
+            fullName, email, password, role,
             age, gender, weight, height,
-            fitnessGoal, dailyCalorieGoal, dailyWaterGoal, phone, address, profilePic
+            fitnessGoal, dailyCalorieGoal, dailyWaterGoal, trainerId, phone, address, profilePic
         } = req.body;
+
+        if (!validateObjectId(trainerId)) {
+            return res.status(400).json({
+                message: "Invalid trainer ID format.",
+                success: false
+            });
+        }
 
         const normalizedEmail = email.toLowerCase();
 
@@ -24,18 +31,10 @@ exports.registerUser = async (req, res, next) => {
             });
         }
 
-        if (password !== confirmPassword) {
-            return res.status(400).json({
-                message: 'Passwords do not match.',
-                success: false
-            });
-        }
-
         const newUser = new User({
             fullName,
             email: normalizedEmail,
             password,
-            confirmPassword,
             role,
             age,
             gender,
@@ -47,13 +46,13 @@ exports.registerUser = async (req, res, next) => {
             phone,
             address,
             profilePic,
-            trainerId
+            trainerId: new mongoose.Types.ObjectId(trainerId)
         });
 
         await newUser.save();
 
         const token = jwt.sign(
-            { userId: newUser._id, email: newUser.email, role: newUser.role },
+            { userId: newUser._id, fullName: newUser.fullName, email: newUser.email, role: newUser.role, trainerId: newUser.trainerId },
             process.env.SECRET_KEY,
             { expiresIn: '1h' }
         );
@@ -76,17 +75,6 @@ exports.registerUser = async (req, res, next) => {
     }
 };
 
-const assignTrainer = async () => {
-    try {
-        const trainer = await Trainer.aggregate([{ $sample: { size: 1 } }]);
-
-        return trainer.length > 0 ? trainer[0] : null;
-
-    } catch (error) {
-        return null;
-    }
-};
-
 exports.loginUser = async (req, res, next) => {
     try {
         const { email, password } = req.body;
@@ -96,7 +84,7 @@ exports.loginUser = async (req, res, next) => {
 
         if (!user) {
             return res.status(401).json({
-                message: 'Invalid email or password.',
+                message: 'You have not registered. Please register to continue.',
                 success: false
             });
         }
@@ -111,7 +99,7 @@ exports.loginUser = async (req, res, next) => {
         }
 
         const token = jwt.sign(
-            { userId: user._id, email: user.email, role: user.role },
+            { userId: user._id, fullName: user.fullName, email: user.email, role: user.role, trainerId: user.trainerId },
             process.env.SECRET_KEY,
             { expiresIn: '1h' }
         );
@@ -120,16 +108,7 @@ exports.loginUser = async (req, res, next) => {
             message: "User login successful.",
             success: true,
             token,
-            user: {
-                id: user._id,
-                fullName: user.fullName,
-                email: user.email,
-                role: user.role,
-                fitnessGoal: user.fitnessGoal,
-                dailyCalorieGoal: user.dailyCalorieGoal,
-                dailyWaterGoal: user.dailyWaterGoal,
-                BMI: user.BMI
-            }
+            user: user
         });
 
     } catch (error) {
@@ -153,7 +132,8 @@ exports.getUserProfileById = async (req, res, next) => {
             .select("-password")
             .populate({
                 path: "trainerId",
-                select: "fullName email specialization experience"
+                select: "fullName email specialization experience",
+                options: { strictPopulate: false }
             })
             .exec();
 

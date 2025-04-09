@@ -1,26 +1,28 @@
 const express = require("express");
-const ValidateNutritionMiddleware = require("../middlewares/ValidateNutritionMiddleware");
 const Auth = require("../middlewares/Auth");
 const NutritionController = require("../controllers/NutritionController");
-
+const ValidateSingleMealEntry = require("../middlewares/ValidateSingleMealEntry");
 const router = express.Router();
 
-// Fetch Nutrition Entries for a Specific User
-router.get("/", Auth, NutritionController.getNutritionEntriesByUserId);
+// Fetch all nutrition entries for the logged in user
+router.get("/all", Auth, NutritionController.getNutritionEntriesByUserId);
 
-// Create Nutrition Entry
-router.post("/addNutrition", Auth, ValidateNutritionMiddleware, NutritionController.createOrUpdateNutritionEntry);
+// Fetch today's nutrition entries for the logged in user
+router.get("/today", Auth, NutritionController.getTodayNutritionEntry);
 
-// Update Water Intake
+// Add or update a meal for a specific date
+router.post("/addNutrition", Auth, ValidateSingleMealEntry, NutritionController.addOrUpdateMealEntry);
+
+// Update water intake for a specific date
 router.patch("/updateWaterIntake", Auth, NutritionController.updateWaterIntake);
 
-// Update Nutrition Entry
-router.put("/update/:id", Auth, ValidateNutritionMiddleware, NutritionController.updateMealByType);
+// Update a specific meal entry by mealType and date
+router.put("/updateMeal", Auth, NutritionController.updateMealByType);
 
-// Delete Meal by Type
-router.delete("/delete/:id", Auth, NutritionController.deleteMealByType);
+// Delete a specific meal from a date by mealType
+router.delete("/deleteMeal", Auth, NutritionController.deleteMealByType);
 
-// Delete Nutrition Entry
-router.delete("/delete/:id", Auth, NutritionController.deleteNutritionEntry);
+// Delete entire nutrition entry for a specific date
+router.delete("/deleteNutritionEntry", Auth, NutritionController.deleteNutritionEntryByDate);
 
 module.exports = router;
